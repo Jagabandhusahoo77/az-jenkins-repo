@@ -1,0 +1,37 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+*.binary
+tfplan-*.txt
+tfplan-*.binary
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.tfvars
+
+# Never commit — secrets injected via env vars or Jenkins credentials
+**/*.auto.tfvars
+**/secrets.tfvars
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Test output
+tests/terratest-output.txt
+tflint-results.xml
+results_junitxml.xml
+tfsec-results.json
+
+# Go
+tests/vendor/
+tests/go.sum

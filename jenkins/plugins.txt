@@ -1,0 +1,42 @@
+# Jenkins Plugins
+# Format: plugin-id:version  (omit version to get latest compatible)
+#
+# Core pipeline plugins
+workflow-aggregator
+pipeline-stage-view
+blueocean
+
+# Multibranch + GitHub integration
+github-branch-source
+github
+
+# Credentials management
+credentials
+credentials-binding
+plain-credentials
+
+# SCM
+git
+
+# Build tools
+ansicolor
+timestamper
+build-timeout
+
+# Notifications
+slack
+
+# Parallel execution
+parallel-test-executor
+
+# JUnit test results
+junit
+
+# Workspace cleanup
+ws-cleanup
+
+# Configuration as Code (JCasC)
+configuration-as-code
+
+# Job DSL (optional — for pipeline-as-code job creation)
+job-dsl

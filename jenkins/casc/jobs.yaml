@@ -1,0 +1,70 @@
+###############################################################################
+# jobs.yaml — Pipeline job definitions via JCasC + Job DSL
+#
+# Creates both pipelines automatically on Jenkins startup.
+# No manual job creation needed.
+###############################################################################
+
+jobs:
+  # ── CI Pipeline — Multibranch ───────────────────────────────────────────────
+  - script: |
+      multibranchPipelineJob('terraform-azure-enterprise-ci') {
+        displayName('Terraform Azure Enterprise — CI')
+        description('Validates, lints, security scans and plans on every branch push')
+
+        branchSources {
+          // For local dev: point at the workspace bind mount
+          // For real GitHub: replace with github { ... } source
+          filesystem {
+            id('local-repo')
+            path('/workspace/terraform-azure-enterprise')
+          }
+        }
+
+        factory {
+          workflowBranchProjectFactory {
+            scriptPath('pipelines/Jenkinsfile.ci')
+          }
+        }
+
+        triggers {
+          periodic(5)  // scan for new branches every 5 minutes
+        }
+
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(10)
+          }
+        }
+      }
+
+  # ── CD Pipeline — Single deployment pipeline ────────────────────────────────
+  - script: |
+      pipelineJob('terraform-azure-enterprise-cd') {
+        displayName('Terraform Azure Enterprise — CD')
+        description('Deploys dev → staging → prod with manual approval gate for prod')
+
+        definition {
+          cpsScm {
+            scm {
+              filesystem {
+                path('/workspace/terraform-azure-enterprise')
+              }
+            }
+            scriptPath('pipelines/Jenkinsfile.cd')
+          }
+        }
+
+        // CD only triggers manually or from CI on main branch
+        // No cron trigger — deployments must be intentional
+        triggers {}
+
+        parameters {
+          choiceParam(
+            'DEPLOY_TARGET',
+            ['all', 'dev-only', 'staging-only', 'prod-only'],
+            'Which environments to deploy'
+          )
+          booleanParam('FORCE_PLAN', false, 'Re-run plan even if artifact exists')
+        }
+      }

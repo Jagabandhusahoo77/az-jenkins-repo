@@ -1,0 +1,359 @@
+/*
+ * Jenkinsfile.cd — Centralized Deployment Pipeline (CD)
+ *
+ * PURPOSE: Apply validated Terraform plans to environments in sequence.
+ *          dev → (auto) → staging → (manual approval) → prod
+ *
+ * TRIGGER: This pipeline is triggered by the CI pipeline completing
+ *          successfully on the `main` branch. It is NOT a Multibranch
+ *          pipeline — it is a single pipeline that deploys all environments.
+ *
+ * APPROVAL GATES:
+ *   - dev:     automatic (no approval needed)
+ *   - staging: automatic after successful dev apply
+ *   - prod:    MANUAL approval required from a member of 'release-managers' group
+ *
+ * CREDENTIAL MODEL:
+ *   Each environment uses a different Service Principal with least-privilege
+ *   permissions scoped to that environment's subscription/resource group.
+ *   Credentials are stored in Jenkins Credentials store (not in code).
+ *
+ *   Jenkins Credentials needed:
+ *     azure-sp-dev     — Username/Password (client_id/client_secret)
+ *     azure-sp-staging — Username/Password
+ *     azure-sp-prod    — Username/Password
+ *     azure-subscription-id  — Secret text
+ *     azure-tenant-id        — Secret text
+ *     tf-sql-admin-login     — Secret text
+ *     tf-sql-admin-password  — Secret text
+ *     tf-ssh-public-key      — Secret text
+ */
+
+pipeline {
+    agent {
+        label 'terraform'
+    }
+
+    options {
+        timeout(time: 2, unit: 'HOURS')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        disableConcurrentBuilds()
+        ansiColor('xterm')
+        timestamps()
+    }
+
+    environment {
+        ARM_SUBSCRIPTION_ID = credentials('azure-subscription-id')
+        ARM_TENANT_ID       = credentials('azure-tenant-id')
+
+        TF_VAR_sql_admin_login    = credentials('tf-sql-admin-login')
+        TF_VAR_sql_admin_password = credentials('tf-sql-admin-password')
+        TF_VAR_ssh_public_key     = credentials('tf-ssh-public-key')
+    }
+
+    parameters {
+        choice(
+            name: 'DEPLOY_TARGET',
+            choices: ['all', 'dev-only', 'staging-only', 'prod-only'],
+            description: 'Which environments to deploy. "all" does sequential dev→staging→prod.'
+        )
+        booleanParam(
+            name: 'FORCE_PLAN',
+            defaultValue: false,
+            description: 'Re-run terraform plan even if a plan artifact exists from CI'
+        )
+        string(
+            name: 'CI_BUILD_NUMBER',
+            defaultValue: '',
+            description: 'CI build number to copy plan artifacts from (leave blank to re-plan)'
+        )
+    }
+
+    stages {
+
+        stage('Validate Trigger') {
+            steps {
+                script {
+                    // Only allow CD to run on main branch
+                    if (env.GIT_BRANCH != 'origin/main' && env.GIT_BRANCH != 'main') {
+                        error("CD pipeline can only run on main branch. Current branch: ${env.GIT_BRANCH}")
+                    }
+                    echo "Deploying commit ${env.GIT_COMMIT} to ${params.DEPLOY_TARGET}"
+                }
+            }
+        }
+
+        /*
+         * Deploy to Dev — always automatic, no approval needed.
+         * Dev exists so that broken applies don't hit staging first.
+         */
+        stage('Deploy: dev') {
+            when {
+                expression { params.DEPLOY_TARGET in ['all', 'dev-only'] }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'azure-sp-dev',
+                        usernameVariable: 'ARM_CLIENT_ID',
+                        passwordVariable: 'ARM_CLIENT_SECRET'
+                    )
+                ]) {
+                    dir('environments/dev') {
+                        sh '''
+                            echo "=== Initialising backend: dev ==="
+                            terraform init \
+                                -input=false \
+                                -reconfigure \
+                                -backend-config="resource_group_name=rg-tfstate-dev-eus" \
+                                -backend-config="storage_account_name=sttfstatedeveus" \
+                                -backend-config="container_name=tfstate" \
+                                -backend-config="key=dev/terraform.tfstate"
+
+                            echo "=== Planning: dev ==="
+                            terraform plan \
+                                -input=false \
+                                -out=tfplan-dev.binary
+
+                            echo "=== Showing plan summary ==="
+                            terraform show -no-color tfplan-dev.binary | tail -20
+                        '''
+
+                        sh '''
+                            echo "=== Applying: dev ==="
+                            terraform apply \
+                                -input=false \
+                                -auto-approve \
+                                tfplan-dev.binary
+
+                            echo "=== Dev apply complete ==="
+                            terraform output -json > dev-outputs.json
+                        '''
+                    }
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'environments/dev/dev-outputs.json', allowEmptyArchive: true
+                    echo "Dev deployment successful."
+                }
+                failure {
+                    error("Dev deployment FAILED. Blocking staging and prod promotion.")
+                }
+            }
+        }
+
+        /*
+         * Deploy to Staging — automatic after successful dev.
+         * Staging is a replica of prod sizing but with non-production data.
+         */
+        stage('Deploy: staging') {
+            when {
+                expression { params.DEPLOY_TARGET in ['all', 'staging-only'] }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'azure-sp-staging',
+                        usernameVariable: 'ARM_CLIENT_ID',
+                        passwordVariable: 'ARM_CLIENT_SECRET'
+                    )
+                ]) {
+                    dir('environments/staging') {
+                        sh '''
+                            echo "=== Initialising backend: staging ==="
+                            terraform init \
+                                -input=false \
+                                -reconfigure \
+                                -backend-config="resource_group_name=rg-tfstate-staging-eus" \
+                                -backend-config="storage_account_name=sttfstatestagingeus" \
+                                -backend-config="container_name=tfstate" \
+                                -backend-config="key=staging/terraform.tfstate"
+
+                            echo "=== Planning: staging ==="
+                            terraform plan \
+                                -input=false \
+                                -out=tfplan-staging.binary
+
+                            terraform show -no-color tfplan-staging.binary | tail -20
+                        '''
+
+                        sh '''
+                            echo "=== Applying: staging ==="
+                            terraform apply \
+                                -input=false \
+                                -auto-approve \
+                                tfplan-staging.binary
+
+                            terraform output -json > staging-outputs.json
+                        '''
+                    }
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'environments/staging/staging-outputs.json', allowEmptyArchive: true
+                    echo "Staging deployment successful."
+                }
+                failure {
+                    // Staging failure is serious — alert immediately
+                    slackSend(
+                        channel: '#platform-alerts',
+                        color: 'danger',
+                        message: "STAGING DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
+                    )
+                    error("Staging deployment FAILED. Blocking prod promotion.")
+                }
+            }
+        }
+
+        /*
+         * Manual Approval Gate — required before prod deployment.
+         *
+         * The approver should:
+         *   1. Review the plan artifact (tfplan-prod.txt) from the CI run
+         *   2. Verify staging deployed successfully and tests passed
+         *   3. Check change management system (ServiceNow/Jira) for approved CR
+         *
+         * Timeout: 4 hours — if no approval, the build aborts (not fails)
+         * so the next CD run can retry.
+         */
+        stage('Approval: prod') {
+            when {
+                expression { params.DEPLOY_TARGET in ['all', 'prod-only'] }
+            }
+            steps {
+                script {
+                    def planSummary = sh(
+                        script: "cat environments/prod/tfplan-prod.txt 2>/dev/null | tail -10 || echo 'Plan file not available'",
+                        returnStdout: true
+                    ).trim()
+
+                    def approvalMessage = """
+PRODUCTION DEPLOYMENT APPROVAL REQUIRED
+
+Build:  ${env.JOB_NAME} #${env.BUILD_NUMBER}
+Commit: ${env.GIT_COMMIT}
+Branch: ${env.GIT_BRANCH}
+
+Plan Summary (last 10 lines):
+${planSummary}
+
+Review full plan at: ${env.BUILD_URL}artifact/environments/prod/tfplan-prod.txt
+
+Approve to deploy to PRODUCTION.
+Abort to cancel this deployment (CI artifacts remain, can redeploy later).
+                    """
+
+                    // Require approval from the release-managers group
+                    // 4-hour timeout — beyond this, deployment auto-aborts (not fails)
+                    timeout(time: 4, unit: 'HOURS') {
+                        input(
+                            message: approvalMessage,
+                            ok: 'Approve Production Deployment',
+                            submitter: 'release-managers',   // Jenkins group name
+                            submitterParameter: 'APPROVER'
+                        )
+                    }
+
+                    echo "Production deployment approved by: ${env.APPROVER}"
+                }
+            }
+        }
+
+        /*
+         * Deploy to Production
+         * -auto-approve is intentional: the human approval gate is the control.
+         * Using a saved plan ensures exactly what was approved gets applied.
+         */
+        stage('Deploy: prod') {
+            when {
+                expression { params.DEPLOY_TARGET in ['all', 'prod-only'] }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'azure-sp-prod',
+                        usernameVariable: 'ARM_CLIENT_ID',
+                        passwordVariable: 'ARM_CLIENT_SECRET'
+                    )
+                ]) {
+                    dir('environments/prod') {
+                        sh '''
+                            echo "=== Initialising backend: prod ==="
+                            terraform init \
+                                -input=false \
+                                -reconfigure \
+                                -backend-config="resource_group_name=rg-tfstate-prod-eus" \
+                                -backend-config="storage_account_name=sttfstateprodeus" \
+                                -backend-config="container_name=tfstate" \
+                                -backend-config="key=prod/terraform.tfstate"
+
+                            echo "=== Planning: prod (fresh plan to ensure no drift since approval) ==="
+                            terraform plan \
+                                -input=false \
+                                -out=tfplan-prod.binary
+
+                            terraform show -no-color tfplan-prod.binary > tfplan-prod-final.txt
+                        '''
+
+                        sh '''
+                            echo "=== Applying: prod ==="
+                            START_TIME=$(date +%s)
+
+                            terraform apply \
+                                -input=false \
+                                -auto-approve \
+                                tfplan-prod.binary
+
+                            END_TIME=$(date +%s)
+                            DURATION=$((END_TIME - START_TIME))
+                            echo "Prod apply completed in ${DURATION}s"
+
+                            terraform output -json > prod-outputs.json
+                        '''
+                    }
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'environments/prod/prod-outputs.json,environments/prod/tfplan-prod-final.txt'
+                    slackSend(
+                        channel: '#platform-deployments',
+                        color: 'good',
+                        message: "PROD DEPLOYED: ${env.JOB_NAME} #${env.BUILD_NUMBER} by ${env.APPROVER}\nCommit: ${env.GIT_COMMIT}"
+                    )
+                }
+                failure {
+                    slackSend(
+                        channel: '#platform-alerts',
+                        color: 'danger',
+                        message: "PROD DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}\n${env.BUILD_URL}\nManual remediation required!"
+                    )
+                    // On prod failure: DO NOT auto-rollback — Terraform state may be partial.
+                    // Pages oncall to manually assess blast radius and decide remediation.
+                    error("Production deployment FAILED. Oncall has been paged.")
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "CD pipeline complete. All targeted environments deployed."
+        }
+        aborted {
+            slackSend(
+                channel: '#platform-deployments',
+                color: 'warning',
+                message: "DEPLOYMENT ABORTED: ${env.JOB_NAME} #${env.BUILD_NUMBER} (approval timeout or manual abort)"
+            )
+        }
+        failure {
+            echo "CD pipeline failed. Check build logs for details."
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

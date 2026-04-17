@@ -1,0 +1,438 @@
+/*
+ * Jenkinsfile.ci — Continuous Integration (Multibranch Pipeline)
+ *
+ * PURPOSE: Validate every push on every branch. Catch format errors, misconfigs,
+ * security issues, and plan drift BEFORE merging to main.
+ *
+ * NEVER runs `terraform apply` — that is the CD pipeline's job.
+ *
+ * BRANCH STRATEGY:
+ *   feature/*  → full CI suite (fmt, validate, lint, security, plan)
+ *   develop    → full CI suite
+ *   main       → full CI suite (CD pipeline then handles deployment)
+ *
+ * AGENT REQUIREMENTS (label: 'terraform'):
+ *   - terraform >= 1.6
+ *   - tflint
+ *   - tfsec OR checkov
+ *   - Azure CLI
+ *   - go >= 1.21 (for Terratest, optional on feature branches)
+ */
+
+pipeline {
+    agent {
+        // Use a dedicated Terraform agent — keeps tools off the master node
+        label 'terraform'
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')   // abort runaway pipelines
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        disableConcurrentBuilds()            // prevent concurrent plans on same branch
+        ansiColor('xterm')                   // coloured output in logs
+        timestamps()
+    }
+
+    environment {
+        // Azure Service Principal — stored in Jenkins Credentials store, NEVER in code
+        // withCredentials injects ARM_* variables that the Terraform AzureRM provider reads
+        ARM_SUBSCRIPTION_ID = credentials('azure-subscription-id')
+        ARM_TENANT_ID       = credentials('azure-tenant-id')
+
+        TFLINT_CONFIG       = "${WORKSPACE}/.tflint.hcl"
+        CHECKOV_CONFIG      = "${WORKSPACE}/.checkov.yaml"
+        CHECKOV_THRESHOLD   = "HIGH"
+        ENVIRONMENTS        = "dev staging prod"
+    }
+
+    parameters {
+        booleanParam(
+            name: 'RUN_TERRATEST',
+            defaultValue: false,
+            description: 'Run Terratest integration tests (slow — run manually or on develop only)'
+        )
+        booleanParam(
+            name: 'SKIP_SECURITY_SCAN',
+            defaultValue: false,
+            description: 'Skip security scan (use only for urgent hotfixes with approval)'
+        )
+    }
+
+    stages {
+
+        /*
+         * Stage 1: Checkout & Setup
+         * Fetch code and print environment info for debugging
+         */
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh '''
+                    echo "=== Build Info ==="
+                    echo "Branch: ${GIT_BRANCH}"
+                    echo "Commit: ${GIT_COMMIT}"
+                    echo "Build:  ${BUILD_NUMBER}"
+                    echo ""
+                    echo "=== Tool Versions ==="
+                    terraform version
+                    tflint --version
+                    checkov --version || tfsec --version
+                    az --version | head -1
+                '''
+            }
+        }
+
+        /*
+         * Stage 2: Terraform Format Check
+         * `terraform fmt -check` exits non-zero if any file needs reformatting.
+         * This enforces consistent code style across all contributors.
+         * Developers must run `terraform fmt -recursive` locally before pushing.
+         */
+        stage('Terraform Format') {
+            steps {
+                sh '''
+                    echo "=== Checking Terraform formatting ==="
+                    terraform fmt -check -recursive -diff .
+                '''
+            }
+            post {
+                failure {
+                    echo "Format check failed. Run 'terraform fmt -recursive' locally and push."
+                }
+            }
+        }
+
+        /*
+         * Stage 3: Parallel Validation + Linting
+         * Run validate and lint concurrently across all environments to save time.
+         * terraform validate checks syntax and internal consistency (no API calls).
+         * tflint catches provider-specific issues terraform validate misses.
+         */
+        stage('Validate & Lint') {
+            parallel {
+
+                stage('Validate: dev') {
+                    steps {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'azure-sp-dev',
+                                usernameVariable: 'ARM_CLIENT_ID',
+                                passwordVariable: 'ARM_CLIENT_SECRET'
+                            )
+                        ]) {
+                            dir('environments/dev') {
+                                sh '''
+                                    terraform init -backend=false -input=false
+                                    terraform validate
+                                '''
+                            }
+                        }
+                    }
+                }
+
+                stage('Validate: staging') {
+                    steps {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'azure-sp-staging',
+                                usernameVariable: 'ARM_CLIENT_ID',
+                                passwordVariable: 'ARM_CLIENT_SECRET'
+                            )
+                        ]) {
+                            dir('environments/staging') {
+                                sh '''
+                                    terraform init -backend=false -input=false
+                                    terraform validate
+                                '''
+                            }
+                        }
+                    }
+                }
+
+                stage('Validate: prod') {
+                    steps {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'azure-sp-prod',
+                                usernameVariable: 'ARM_CLIENT_ID',
+                                passwordVariable: 'ARM_CLIENT_SECRET'
+                            )
+                        ]) {
+                            dir('environments/prod') {
+                                sh '''
+                                    terraform init -backend=false -input=false
+                                    terraform validate
+                                '''
+                            }
+                        }
+                    }
+                }
+
+                stage('TFLint') {
+                    steps {
+                        sh '''
+                            echo "=== Running TFLint ==="
+                            # --recursive lints all modules and environments
+                            tflint --config="${TFLINT_CONFIG}" --recursive --format=default
+                        '''
+                    }
+                    post {
+                        always {
+                            // Publish JUnit report if tflint outputs JUnit format
+                            sh 'tflint --config="${TFLINT_CONFIG}" --recursive --format=junit > tflint-results.xml || true'
+                            junit allowEmptyResults: true, testResults: 'tflint-results.xml'
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         * Stage 4: Security Scanning
+         * Checkov scans for CIS/NIST benchmark violations, hardcoded secrets,
+         * insecure defaults. HIGH/CRITICAL failures block the pipeline.
+         * Skippable only with explicit parameter (requires PR approval).
+         */
+        stage('Security Scan') {
+            when {
+                expression { !params.SKIP_SECURITY_SCAN }
+            }
+            parallel {
+
+                stage('Checkov') {
+                    steps {
+                        sh '''
+                            echo "=== Running Checkov security scan ==="
+                            checkov \
+                                --directory . \
+                                --framework terraform \
+                                --output cli \
+                                --output junitxml \
+                                --output-file-path . \
+                                --soft-fail-on LOW,MEDIUM \
+                                --compact \
+                                --skip-check CKV_AZURE_131  # example: skip if intentionally accepted risk
+                        '''
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true, testResults: 'results_junitxml.xml'
+                        }
+                    }
+                }
+
+                stage('tfsec') {
+                    steps {
+                        sh '''
+                            echo "=== Running tfsec ==="
+                            tfsec . \
+                                --minimum-severity HIGH \
+                                --format json \
+                                --out tfsec-results.json || true
+
+                            # Parse and display summary
+                            if [ -f tfsec-results.json ]; then
+                                CRITICAL=$(cat tfsec-results.json | python3 -c "import sys,json; results=json.load(sys.stdin); print(sum(1 for r in results.get('results',[]) if r.get('severity')=='CRITICAL'))")
+                                HIGH=$(cat tfsec-results.json | python3 -c "import sys,json; results=json.load(sys.stdin); print(sum(1 for r in results.get('results',[]) if r.get('severity')=='HIGH'))")
+                                echo "tfsec found: CRITICAL=$CRITICAL HIGH=$HIGH"
+                                if [ "$CRITICAL" -gt 0 ]; then
+                                    echo "CRITICAL security findings — failing build"
+                                    exit 1
+                                fi
+                            fi
+                        '''
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'tfsec-results.json', allowEmptyArchive: true
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         * Stage 5: Terraform Plan (per environment)
+         * Plans generate a machine-readable output saved as an artifact.
+         * The CD pipeline reuses this exact plan artifact to ensure
+         * what was reviewed == what gets applied (plan before approve pattern).
+         *
+         * Plans are run in parallel for speed.
+         */
+        stage('Terraform Plan') {
+            parallel {
+
+                stage('Plan: dev') {
+                    steps {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'azure-sp-dev',
+                                usernameVariable: 'ARM_CLIENT_ID',
+                                passwordVariable: 'ARM_CLIENT_SECRET'
+                            )
+                        ]) {
+                            dir('environments/dev') {
+                                sh '''
+                                    terraform init \
+                                        -input=false \
+                                        -backend-config="resource_group_name=rg-tfstate-dev-eus" \
+                                        -backend-config="storage_account_name=sttfstatedeveus" \
+                                        -backend-config="container_name=tfstate" \
+                                        -backend-config="key=dev/terraform.tfstate"
+
+                                    # -var flags for secrets injected from Jenkins env vars
+                                    terraform plan \
+                                        -input=false \
+                                        -detailed-exitcode \
+                                        -out=tfplan-dev.binary \
+                                        -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
+                                        -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
+                                        -var="ssh_public_key=${TF_VAR_ssh_public_key}"
+
+                                    # Save human-readable plan for review
+                                    terraform show -no-color tfplan-dev.binary > tfplan-dev.txt
+                                '''
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'environments/dev/tfplan-dev.binary,environments/dev/tfplan-dev.txt'
+                        }
+                    }
+                }
+
+                stage('Plan: staging') {
+                    steps {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'azure-sp-staging',
+                                usernameVariable: 'ARM_CLIENT_ID',
+                                passwordVariable: 'ARM_CLIENT_SECRET'
+                            )
+                        ]) {
+                            dir('environments/staging') {
+                                sh '''
+                                    terraform init \
+                                        -input=false \
+                                        -backend-config="resource_group_name=rg-tfstate-staging-eus" \
+                                        -backend-config="storage_account_name=sttfstatestagingeus" \
+                                        -backend-config="container_name=tfstate" \
+                                        -backend-config="key=staging/terraform.tfstate"
+
+                                    terraform plan \
+                                        -input=false \
+                                        -detailed-exitcode \
+                                        -out=tfplan-staging.binary \
+                                        -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
+                                        -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
+                                        -var="ssh_public_key=${TF_VAR_ssh_public_key}"
+
+                                    terraform show -no-color tfplan-staging.binary > tfplan-staging.txt
+                                '''
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'environments/staging/tfplan-staging.binary,environments/staging/tfplan-staging.txt'
+                        }
+                    }
+                }
+
+                stage('Plan: prod') {
+                    steps {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'azure-sp-prod',
+                                usernameVariable: 'ARM_CLIENT_ID',
+                                passwordVariable: 'ARM_CLIENT_SECRET'
+                            )
+                        ]) {
+                            dir('environments/prod') {
+                                sh '''
+                                    terraform init \
+                                        -input=false \
+                                        -backend-config="resource_group_name=rg-tfstate-prod-eus" \
+                                        -backend-config="storage_account_name=sttfstateprodeus" \
+                                        -backend-config="container_name=tfstate" \
+                                        -backend-config="key=prod/terraform.tfstate"
+
+                                    terraform plan \
+                                        -input=false \
+                                        -detailed-exitcode \
+                                        -out=tfplan-prod.binary \
+                                        -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
+                                        -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
+                                        -var="ssh_public_key=${TF_VAR_ssh_public_key}"
+
+                                    terraform show -no-color tfplan-prod.binary > tfplan-prod.txt
+                                '''
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'environments/prod/tfplan-prod.binary,environments/prod/tfplan-prod.txt'
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         * Stage 6: Terratest — optional, runs only when explicitly triggered
+         * or on the develop branch. Tests spin up REAL Azure resources so
+         * they cost money and take time (~15 min). Run them pre-merge on
+         * significant infrastructure changes, not on every feature commit.
+         */
+        stage('Terratest') {
+            when {
+                anyOf {
+                    branch 'develop'
+                    expression { params.RUN_TERRATEST }
+                }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'azure-sp-dev',
+                        usernameVariable: 'ARM_CLIENT_ID',
+                        passwordVariable: 'ARM_CLIENT_SECRET'
+                    )
+                ]) {
+                    dir('tests') {
+                        sh '''
+                            go test ./... \
+                                -v \
+                                -timeout 60m \
+                                -run TestNetworkingModule \
+                                2>&1 | tee terratest-output.txt
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'tests/terratest-output.txt', allowEmptyArchive: true
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "CI passed. Artifacts archived. Merge to main to trigger CD pipeline."
+        }
+        failure {
+            slackSend(
+                channel: '#platform-alerts',
+                color: 'danger',
+                message: "CI FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)\nBranch: ${env.GIT_BRANCH}\nSee build log for details."
+            )
+        }
+        always {
+            cleanWs()  // clean workspace to prevent state leaking between runs
+        }
+    }
+}

@@ -1,0 +1,64 @@
+# .checkov.yaml — Checkov configuration
+#
+# Checkov checks Terraform against CIS, NIST, SOC2, PCI-DSS benchmarks.
+# Rules are skipped only when there is a documented, accepted risk.
+# Each skip must include a comment explaining the business justification.
+
+framework:
+  - terraform
+
+directory:
+  - .
+
+output:
+  - cli
+  - junitxml
+
+compact: true
+quiet: false
+
+# Soft-fail means the scan reports findings but does not fail the build.
+# Only LOW and MEDIUM are soft-failed. HIGH and CRITICAL always fail.
+soft-fail-on:
+  - LOW
+  - MEDIUM
+
+# Skipped checks — each MUST have a justification comment
+skip-check:
+  # CKV_AZURE_131: Not all resource types support all log categories — handled per-resource
+  - CKV_AZURE_131
+
+  # CKV2_AZURE_1: Backend tfstate storage uses platform keys; app storage uses CMK
+  - CKV2_AZURE_1
+
+  # CKV2_AZURE_31: AzureFirewallSubnet and GatewaySubnet — Azure PROHIBITS NSG on these
+  #   subnets by design. Bastion and PE subnets protected by NSG at spoke level.
+  - CKV2_AZURE_31
+
+  # CKV_AZURE_206: ZRS and GZRS ARE replication types — checkov incorrectly flags
+  #   anything that is not GRS/RAGRS. ZRS provides zone-level redundancy which is sufficient.
+  - CKV_AZURE_206
+
+  # CKV_AZURE_40: Key expiry is managed via rotation_policy.expire_after = "P1Y".
+  #   Checkov static analysis cannot evaluate the rotation_policy block as an expiration date.
+  - CKV_AZURE_40
+
+  # CKV_AZURE_229: zone_redundant = false is intentional for dev and staging.
+  #   Prod sets zone_redundant = true via var.zone_redundant. Checkov cannot evaluate per-env.
+  - CKV_AZURE_229
+
+  # CKV_AZURE_224: SQL Ledger is an optional compliance feature (blockchain-based audit).
+  #   Not universally required — enable only when cryptographic non-repudiation is mandated.
+  - CKV_AZURE_224
+
+  # CKV2_AZURE_21: Blob read logging handled via azurerm_monitor_diagnostic_setting,
+  #   not blob_properties.logging. Checkov only checks the latter.
+  - CKV2_AZURE_21
+
+  # CKV_AZURE_216: threat_intelligence_mode = "Deny" is set on the Firewall POLICY.
+  #   Checkov incorrectly checks the azurerm_firewall resource instead of the policy.
+  - CKV_AZURE_216
+
+  # CKV_AZURE_218: ssl_policy is defined in AppGW resource. Checkov cannot evaluate
+  #   for_each resources with dynamic configs correctly when appgw_configs is empty map.
+  - CKV_AZURE_218

@@ -1,0 +1,71 @@
+###############################################################################
+# docker-compose.yml — Persistent Jenkins for local Terraform CI/CD
+#
+# Persistence strategy:
+#   - jenkins_home volume  → all Jenkins config, jobs, credentials, history
+#   - project bind mount   → live access to your Terraform code
+#
+# Usage:
+#   docker compose up -d          # start
+#   docker compose down           # stop (data preserved in volume)
+#   docker compose down -v        # stop + DELETE all data (nuclear reset)
+#   docker compose logs -f        # stream logs
+###############################################################################
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins-terraform
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"    # Jenkins UI
+      - "50000:50000"  # Agent JNLP port (for future remote agents)
+
+    volumes:
+      # ── Persistent Jenkins home (survives container restart/rebuild) ────────
+      - jenkins_home:/var/jenkins_home
+
+      # ── Live project code mount (edit locally, pipeline runs latest) ────────
+      - /home/jagabandhu-sahoo/cicd-project:/workspace:ro
+
+      # ── JCasC configuration (auto-reloaded by Jenkins) ─────────────────────
+      - ./casc:/var/jenkins_home/casc:ro
+
+      # ── Docker socket (optional — enables Docker-in-Docker agents) ──────────
+      # - /var/run/docker.sock:/var/run/docker.sock
+
+    environment:
+      # Jenkins Configuration as Code path
+      CASC_JENKINS_CONFIG: /var/jenkins_home/casc
+
+      # Skip setup wizard — JCasC handles all config
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Dhudson.model.DirectoryBrowserSupport.CSP=
+        -Xmx1g
+
+      # Jenkins URL (used in email/Slack notifications)
+      JENKINS_URL: "http://localhost:8080"
+
+    # Resource limits — prevents Jenkins from eating all RAM
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
+
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s   # Jenkins takes ~60-90s to start
+
+volumes:
+  # Named volume — Docker manages location, survives `docker compose down`
+  jenkins_home:
+    driver: local

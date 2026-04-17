@@ -1,0 +1,125 @@
+###############################################################################
+# jenkins.yaml — Jenkins Configuration as Code (JCasC)
+#
+# This file configures Jenkins declaratively. Changes here are auto-reloaded
+# without restarting Jenkins (Manage Jenkins → Configuration as Code → Reload).
+#
+# WHY JCasC?
+#   - Jenkins config is version-controlled (no "click-ops" that can't be audited)
+#   - Reproducible: rebuild the container and Jenkins is fully configured
+#   - Secrets come from environment variables (never hardcoded here)
+###############################################################################
+
+jenkins:
+  systemMessage: "Terraform Azure Enterprise CI/CD — Managed by JCasC"
+  numExecutors: 2          # controller runs 2 jobs concurrently (local dev only)
+  mode: NORMAL
+  quietPeriod: 0
+
+  # Security — local user database for local dev
+  # In production, replace with LDAP/SAML/Azure AD
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin123}"   # override via env var
+          properties:
+            - mailer:
+                emailAddress: "admin@localhost"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  # Agent label used by both Jenkinsfiles (label: 'terraform')
+  # For local dev, the controller itself acts as the 'terraform' agent
+  nodes:
+    - permanent:
+        name: "terraform-agent"
+        labelString: "terraform"
+        remoteFS: "/var/jenkins_home/agents/terraform"
+        numExecutors: 2
+        launcher:
+          inbound:
+            workDirSettings:
+              disabled: false
+
+  # Global environment variables available to all pipelines
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "TF_CLI_ARGS"
+            value: "-no-color"
+          - key: "CHECKOV_CONFIG"
+            value: "/workspace/terraform-azure-enterprise/.checkov.yaml"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # ── Azure Subscription ID ───────────────────────────────────────────
+          - string:
+              id: "azure-subscription-id"
+              description: "Azure Subscription ID"
+              secret: "${AZURE_SUBSCRIPTION_ID:-placeholder}"
+
+          # ── Azure Tenant ID ─────────────────────────────────────────────────
+          - string:
+              id: "azure-tenant-id"
+              description: "Azure Tenant ID"
+              secret: "${AZURE_TENANT_ID:-placeholder}"
+
+          # ── Service Principal — Dev ─────────────────────────────────────────
+          - usernamePassword:
+              id: "azure-sp-dev"
+              description: "Azure Service Principal — Dev environment"
+              username: "${AZURE_SP_DEV_CLIENT_ID:-placeholder}"
+              password: "${AZURE_SP_DEV_CLIENT_SECRET:-placeholder}"
+
+          # ── Service Principal — Staging ─────────────────────────────────────
+          - usernamePassword:
+              id: "azure-sp-staging"
+              description: "Azure Service Principal — Staging environment"
+              username: "${AZURE_SP_STAGING_CLIENT_ID:-placeholder}"
+              password: "${AZURE_SP_STAGING_CLIENT_SECRET:-placeholder}"
+
+          # ── Service Principal — Prod ─────────────────────────────────────────
+          - usernamePassword:
+              id: "azure-sp-prod"
+              description: "Azure Service Principal — Prod environment"
+              username: "${AZURE_SP_PROD_CLIENT_ID:-placeholder}"
+              password: "${AZURE_SP_PROD_CLIENT_SECRET:-placeholder}"
+
+          # ── Terraform sensitive vars ─────────────────────────────────────────
+          - string:
+              id: "tf-sql-admin-login"
+              description: "Terraform var: SQL admin username"
+              secret: "${TF_VAR_sql_admin_login:-sqladmin}"
+
+          - string:
+              id: "tf-sql-admin-password"
+              description: "Terraform var: SQL admin password"
+              secret: "${TF_VAR_sql_admin_password:-placeholder}"
+
+          - string:
+              id: "tf-ssh-public-key"
+              description: "Terraform var: SSH public key for VMSS"
+              secret: "${TF_VAR_ssh_public_key:-placeholder}"
+
+tool:
+  git:
+    installations:
+      - name: Default
+        home: git
+
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+    adminAddress: "admin@localhost"
+
+  # Slack notification config (optional — fill in your workspace)
+  slackNotifier:
+    teamDomain: ""
+    tokenCredentialId: ""
+    room: "#platform-alerts"
