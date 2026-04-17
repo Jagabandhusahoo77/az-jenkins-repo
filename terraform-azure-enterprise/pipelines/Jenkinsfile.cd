@@ -196,12 +196,7 @@ pipeline {
                     echo "Staging deployment successful."
                 }
                 failure {
-                    // Staging failure is serious — alert immediately
-                    slackSend(
-                        channel: '#platform-alerts',
-                        color: 'danger',
-                        message: "STAGING DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
-                    )
+                    echo "STAGING DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                     error("Staging deployment FAILED. Blocking prod promotion.")
                 }
             }
@@ -318,21 +313,11 @@ Abort to cancel this deployment (CI artifacts remain, can redeploy later).
             post {
                 success {
                     archiveArtifacts artifacts: 'environments/prod/prod-outputs.json,environments/prod/tfplan-prod-final.txt'
-                    slackSend(
-                        channel: '#platform-deployments',
-                        color: 'good',
-                        message: "PROD DEPLOYED: ${env.JOB_NAME} #${env.BUILD_NUMBER} by ${env.APPROVER}\nCommit: ${env.GIT_COMMIT}"
-                    )
+                    echo "PROD DEPLOYED: ${env.JOB_NAME} #${env.BUILD_NUMBER} by ${env.APPROVER}"
                 }
                 failure {
-                    slackSend(
-                        channel: '#platform-alerts',
-                        color: 'danger',
-                        message: "PROD DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}\n${env.BUILD_URL}\nManual remediation required!"
-                    )
-                    // On prod failure: DO NOT auto-rollback — Terraform state may be partial.
-                    // Pages oncall to manually assess blast radius and decide remediation.
-                    error("Production deployment FAILED. Oncall has been paged.")
+                    echo "PROD DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER} — Manual remediation required!"
+                    error("Production deployment FAILED.")
                 }
             }
         }
@@ -343,11 +328,7 @@ Abort to cancel this deployment (CI artifacts remain, can redeploy later).
             echo "CD pipeline complete. All targeted environments deployed."
         }
         aborted {
-            slackSend(
-                channel: '#platform-deployments',
-                color: 'warning',
-                message: "DEPLOYMENT ABORTED: ${env.JOB_NAME} #${env.BUILD_NUMBER} (approval timeout or manual abort)"
-            )
+            echo "DEPLOYMENT ABORTED: ${env.JOB_NAME} #${env.BUILD_NUMBER} (approval timeout or manual abort)"
         }
         failure {
             echo "CD pipeline failed. Check build logs for details."

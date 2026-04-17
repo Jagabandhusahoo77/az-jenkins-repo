@@ -425,11 +425,7 @@ pipeline {
             echo "CI passed. Artifacts archived. Merge to main to trigger CD pipeline."
         }
         failure {
-            slackSend(
-                channel: '#platform-alerts',
-                color: 'danger',
-                message: "CI FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)\nBranch: ${env.GIT_BRANCH}\nSee build log for details."
-            )
+            echo "CI FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER} — Branch: ${env.GIT_BRANCH}"
         }
         always {
             cleanWs()  // clean workspace to prevent state leaking between runs
