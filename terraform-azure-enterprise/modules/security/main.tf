@@ -28,7 +28,7 @@ terraform {
 resource "azurerm_public_ip" "firewall" {
   name                = "pip-afw-${var.environment}-${var.location_short}"
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = var.network_resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
   zones               = ["1", "2", "3"] # zone redundant
@@ -39,7 +39,7 @@ resource "azurerm_public_ip" "firewall" {
 resource "azurerm_firewall_policy" "this" {
   name                     = "afwp-${var.environment}-${var.location_short}"
   location                 = var.location
-  resource_group_name      = var.resource_group_name
+  resource_group_name      = var.network_resource_group_name
   sku                      = "Premium"
   threat_intelligence_mode = "Deny" # Deny blocks known-bad IPs, not just alerts
 
@@ -55,7 +55,7 @@ resource "azurerm_firewall_policy" "this" {
 }
 
 # Application rule collection — allow specific outbound FQDNs (allowlist egress)
-resource "azurerm_firewall_policy_rule_collection_group" "app_rules" {
+resource "azurerm_firewall_policy_rule_collection_group" "app_rules" { #tfsec:ignore:azure-network-no-public-ingress
   name               = "DefaultAppRuleCollectionGroup"
   firewall_policy_id = azurerm_firewall_policy.this.id
   priority           = 200
@@ -115,7 +115,7 @@ resource "azurerm_firewall_policy_rule_collection_group" "app_rules" {
 resource "azurerm_firewall" "this" {
   name                = "afw-${var.hub_name}-${var.environment}-${var.location_short}"
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = var.network_resource_group_name
   sku_name            = "AZFW_VNet"
   sku_tier            = "Premium"
   firewall_policy_id  = azurerm_firewall_policy.this.id

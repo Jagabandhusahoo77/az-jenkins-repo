@@ -61,20 +61,21 @@ module "networking" {
 module "security" {
   source = "../../modules/security"
 
-  hub_name            = var.hub_name
-  workload            = var.workload
-  environment         = var.environment
-  location            = var.location
-  location_short      = var.location_short
-  resource_group_name = azurerm_resource_group.security.name
-  firewall_subnet_id  = module.networking.firewall_subnet_id
-  gateway_subnet_id   = module.networking.gateway_subnet_id
-  pe_subnet_id        = module.networking.spoke_pe_subnet_ids["app"]
-  hub_vnet_id         = module.networking.hub_vnet_id
-  spoke_vnet_ids      = module.networking.spoke_vnet_ids
-  kv_allowed_ips      = var.kv_allowed_ips
-  deploy_vpn_gateway  = false # VPN Gateway ~$140/month — skip in dev
-  tags                = local.tags
+  hub_name                    = var.hub_name
+  workload                    = var.workload
+  environment                 = var.environment
+  location                    = var.location
+  location_short              = var.location_short
+  resource_group_name         = azurerm_resource_group.security.name
+  network_resource_group_name = azurerm_resource_group.network.name
+  firewall_subnet_id          = module.networking.firewall_subnet_id
+  gateway_subnet_id           = module.networking.gateway_subnet_id
+  pe_subnet_id                = module.networking.spoke_pe_subnet_ids["app"]
+  hub_vnet_id                 = module.networking.hub_vnet_id
+  spoke_vnet_ids              = module.networking.spoke_vnet_ids
+  kv_allowed_ips              = var.kv_allowed_ips
+  deploy_vpn_gateway          = false # VPN Gateway ~$140/month — skip in dev
+  tags                        = local.tags
 
   depends_on = [module.networking]
 }

@@ -31,6 +31,11 @@ variable "resource_group_name" {
   type = string
 }
 
+variable "network_resource_group_name" {
+  description = "Resource group of the hub VNet — Firewall must be in same RG as its subnet"
+  type        = string
+}
+
 variable "firewall_subnet_id" {
   description = "ID of AzureFirewallSubnet in the hub VNet"
   type        = string
