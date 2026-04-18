@@ -140,7 +140,7 @@ module "database" {
   sql_admin_password    = var.sql_admin_password
   aad_admin_login       = var.aad_admin_login
   aad_admin_object_id   = var.aad_admin_object_id
-  sql_location          = "eastus2"
+  sql_location          = "westus2"
   db_sku_name           = var.db_sku_name
   db_max_size_gb        = var.db_max_size_gb
   pe_subnet_id          = module.networking.spoke_pe_subnet_ids["app"]

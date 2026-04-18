@@ -40,7 +40,7 @@ resource "azurerm_storage_account" "this" {
 
   blob_properties {
     versioning_enabled  = true
-    change_feed_enabled = true # required for point-in-time restore
+    change_feed_enabled = true
 
     delete_retention_policy {
       days = 30
@@ -49,10 +49,7 @@ resource "azurerm_storage_account" "this" {
     container_delete_retention_policy {
       days = 30
     }
-
-    restore_policy {
-      days = 29 # must be less than delete_retention_policy.days
-    }
+    # restore_policy removed — conflicts with container immutability policy (WORM)
   }
 
   identity {
