@@ -203,14 +203,13 @@ pipeline {
                         sh '''
                             echo "=== Running Checkov security scan ==="
                             checkov \
-                                --directory . \
+                                --config-file "${CHECKOV_CONFIG}" \
+                                --directory terraform-azure-enterprise \
                                 --framework terraform \
                                 --output cli \
                                 --output junitxml \
                                 --output-file-path . \
-                                --soft-fail-on LOW,MEDIUM \
-                                --compact \
-                                --skip-check CKV_AZURE_131  # example: skip if intentionally accepted risk
+                                --compact
                         '''
                     }
                     post {
