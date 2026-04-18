@@ -39,8 +39,8 @@ pipeline {
         ARM_SUBSCRIPTION_ID = credentials('azure-subscription-id')
         ARM_TENANT_ID       = credentials('azure-tenant-id')
 
-        TFLINT_CONFIG       = "${WORKSPACE}/.tflint.hcl"
-        CHECKOV_CONFIG      = "${WORKSPACE}/.checkov.yaml"
+        TFLINT_CONFIG       = "${WORKSPACE}/terraform-azure-enterprise/.tflint.hcl"
+        CHECKOV_CONFIG      = "${WORKSPACE}/terraform-azure-enterprise/.checkov.yaml"
         CHECKOV_THRESHOLD   = "HIGH"
         ENVIRONMENTS        = "dev staging prod"
     }
