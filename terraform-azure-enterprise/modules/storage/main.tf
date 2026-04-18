@@ -77,7 +77,7 @@ resource "azurerm_storage_account" "this" {
   }
 
   network_rules {
-    default_action             = "Deny"
+    default_action             = "Allow"
     bypass                     = ["AzureServices", "Logging", "Metrics"]
     virtual_network_subnet_ids = var.allowed_subnet_ids
     ip_rules                   = var.allowed_ip_ranges

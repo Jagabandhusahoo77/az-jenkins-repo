@@ -46,7 +46,7 @@ aad_admin_object_id = "f9f390ab-9e5b-4613-bee3-4d0310d8d45e"
 security_alert_emails = ["platform-team@company.com"]
 
 # Compute — dev uses minimum sizing
-vm_sku         = "Standard_D2s_v5"
+vm_sku         = "Standard_D2s_v3"
 instance_count = 2
 autoscale_min  = 2
 autoscale_max  = 4
