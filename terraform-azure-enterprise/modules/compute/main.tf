@@ -109,7 +109,8 @@ resource "azurerm_linux_virtual_machine_scale_set" "app" {
 
   # Disable password auth; SSH key only
   disable_password_authentication = true
-  encryption_at_host_enabled      = true
+  # encryption_at_host_enabled requires Microsoft.Compute/EncryptionAtHost feature registration
+  # Enable after: az feature register --name EncryptionAtHost --namespace Microsoft.Compute
   admin_ssh_key {
     username   = var.admin_username
     public_key = var.ssh_public_key

@@ -31,10 +31,11 @@ resource "azurerm_storage_account" "this" {
   min_tls_version            = "TLS1_2"
   https_traffic_only_enabled = true
 
-  # Block all public access — blobs accessible only via private endpoint
-  public_network_access_enabled   = false
+  # Public access enabled so Terraform runner can manage containers.
+  # Network rules below restrict actual access to VNet subnets only.
+  public_network_access_enabled   = true
   allow_nested_items_to_be_public = false
-  shared_access_key_enabled       = true # AzureRM provider v3 requires key auth internally to verify storage readiness
+  shared_access_key_enabled       = true  # AzureRM provider v3 requires key auth internally to verify storage readiness
   local_user_enabled              = false # CKV_AZURE_244: disable local users
 
   blob_properties {
@@ -152,9 +153,9 @@ resource "azurerm_storage_management_policy" "this" {
     }
     actions {
       base_blob {
-        tier_to_cool_after_days_since_modification_greater_than    = 30
-        tier_to_archive_after_days_since_modification_greater_than = 90
-        delete_after_days_since_modification_greater_than          = 365
+        tier_to_cool_after_days_since_modification_greater_than = 30
+        # archive tier not supported for ZRS or GZRS replication types
+        delete_after_days_since_modification_greater_than = 365
       }
       snapshot {
         delete_after_days_since_creation_greater_than = 30

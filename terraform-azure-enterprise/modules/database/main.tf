@@ -24,9 +24,13 @@ terraform {
 ###############################################################################
 # SQL Server
 ###############################################################################
+locals {
+  sql_location = var.sql_location != "" ? var.sql_location : var.location
+}
+
 resource "azurerm_mssql_server" "this" {
   name                         = "sql-${var.workload}-${var.environment}-${var.location_short}"
-  location                     = var.location
+  location                     = local.sql_location
   resource_group_name          = var.resource_group_name
   version                      = "12.0"
   administrator_login          = var.sql_admin_login

@@ -14,6 +14,12 @@ variable "location" {
   type = string
 }
 
+variable "sql_location" {
+  description = "Azure region for SQL Server — can differ from main location if eastus has quota restrictions"
+  type        = string
+  default     = ""
+}
+
 variable "location_short" {
   type = string
 }
