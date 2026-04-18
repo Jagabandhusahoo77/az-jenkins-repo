@@ -324,9 +324,12 @@ resource "azurerm_private_endpoint" "keyvault" {
     subresource_names              = ["vault"]
   }
 
-  private_dns_zone_group {
-    name                 = "keyvault-dns-zone-group"
-    private_dns_zone_ids = [var.keyvault_private_dns_zone_id]
+  dynamic "private_dns_zone_group" {
+    for_each = var.keyvault_private_dns_zone_id != "" ? [1] : []
+    content {
+      name                 = "keyvault-dns-zone-group"
+      private_dns_zone_ids = [var.keyvault_private_dns_zone_id]
+    }
   }
 
   tags = var.tags
