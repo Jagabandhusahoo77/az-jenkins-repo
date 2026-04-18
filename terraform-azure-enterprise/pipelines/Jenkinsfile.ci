@@ -172,13 +172,12 @@ pipeline {
                     steps {
                         sh '''
                             echo "=== Running TFLint ==="
-                            # --recursive lints all modules and environments
+                            tflint --config="${TFLINT_CONFIG}" --init
                             tflint --config="${TFLINT_CONFIG}" --recursive --format=default
                         '''
                     }
                     post {
                         always {
-                            // Publish JUnit report if tflint outputs JUnit format
                             sh 'tflint --config="${TFLINT_CONFIG}" --recursive --format=junit > tflint-results.xml || true'
                             junit allowEmptyResults: true, testResults: 'tflint-results.xml'
                         }
