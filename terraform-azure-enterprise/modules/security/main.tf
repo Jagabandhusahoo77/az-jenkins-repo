@@ -288,8 +288,14 @@ resource "azurerm_application_gateway" "this" {
 ###############################################################################
 data "azurerm_client_config" "current" {}
 
+locals {
+  # Key Vault names are globally unique across all Azure tenants.
+  # Embedding 6 chars of the subscription ID guarantees uniqueness.
+  kv_name = "kv-${var.workload}-${var.environment}-${substr(data.azurerm_client_config.current.subscription_id, 0, 6)}"
+}
+
 resource "azurerm_key_vault" "this" {
-  name                       = "kv-${var.workload}-${var.environment}-${var.location_short}"
+  name                       = local.kv_name
   location                   = var.location
   resource_group_name        = var.resource_group_name
   tenant_id                  = data.azurerm_client_config.current.tenant_id
