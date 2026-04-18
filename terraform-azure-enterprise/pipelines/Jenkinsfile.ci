@@ -271,7 +271,13 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/dev') {
                                 sh '''
-                                    terraform init -input=false -backend=false -reconfigure
+                                    # Override azurerm backend with local for CI plan (no storage account needed)
+                                    cat > override.tf << 'EOF'
+terraform {
+  backend "local" {}
+}
+EOF
+                                    terraform init -input=false -reconfigure
 
                                     terraform plan \
                                         -input=false \
@@ -303,7 +309,13 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/staging') {
                                 sh '''
-                                    terraform init -input=false -backend=false -reconfigure
+                                    # Override azurerm backend with local for CI plan (no storage account needed)
+                                    cat > override.tf << 'EOF'
+terraform {
+  backend "local" {}
+}
+EOF
+                                    terraform init -input=false -reconfigure
 
                                     terraform plan \
                                         -input=false \
@@ -335,7 +347,13 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/prod') {
                                 sh '''
-                                    terraform init -input=false -backend=false -reconfigure
+                                    # Override azurerm backend with local for CI plan (no storage account needed)
+                                    cat > override.tf << 'EOF'
+terraform {
+  backend "local" {}
+}
+EOF
+                                    terraform init -input=false -reconfigure
 
                                     terraform plan \
                                         -input=false \
