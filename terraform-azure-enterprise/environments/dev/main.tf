@@ -143,6 +143,7 @@ module "compute" {
   resource_group_id   = azurerm_resource_group.compute.id
   app_subnet_id       = module.networking.spoke_app_subnet_ids["app"]
   vm_sku              = var.vm_sku
+  vm_zones            = ["1"]
   instance_count      = var.instance_count
   autoscale_min       = var.autoscale_min
   autoscale_max       = var.autoscale_max

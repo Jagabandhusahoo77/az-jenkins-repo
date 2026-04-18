@@ -117,8 +117,8 @@ resource "azurerm_linux_virtual_machine_scale_set" "app" {
   }
 
   # Spread instances across availability zones for HA
-  zones        = ["1", "2", "3"]
-  zone_balance = true
+  zones        = var.vm_zones
+  zone_balance = length(var.vm_zones) > 1
 
   upgrade_mode = "Rolling"
   rolling_upgrade_policy {

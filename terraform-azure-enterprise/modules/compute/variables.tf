@@ -39,6 +39,12 @@ variable "vm_sku" {
   default     = "Standard_D2s_v5"
 }
 
+variable "vm_zones" {
+  description = "Availability zones for VMSS. Use [\"1\"] for dev to avoid capacity constraints"
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
 variable "instance_count" {
   description = "Initial instance count (autoscale will override)"
   type        = number
