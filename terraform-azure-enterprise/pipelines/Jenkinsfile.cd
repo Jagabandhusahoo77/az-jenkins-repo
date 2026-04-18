@@ -99,7 +99,7 @@ pipeline {
                         passwordVariable: 'ARM_CLIENT_SECRET'
                     )
                 ]) {
-                    dir('environments/dev') {
+                    dir('terraform-azure-enterprise/environments/dev') {
                         sh '''
                             echo "=== Initialising backend: dev ==="
                             terraform init \
@@ -134,7 +134,7 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'environments/dev/dev-outputs.json', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'terraform-azure-enterprise/environments/dev/dev-outputs.json', allowEmptyArchive: true
                     echo "Dev deployment successful."
                 }
                 failure {
@@ -159,7 +159,7 @@ pipeline {
                         passwordVariable: 'ARM_CLIENT_SECRET'
                     )
                 ]) {
-                    dir('environments/staging') {
+                    dir('terraform-azure-enterprise/environments/staging') {
                         sh '''
                             echo "=== Initialising backend: staging ==="
                             terraform init \
@@ -192,7 +192,7 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'environments/staging/staging-outputs.json', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'terraform-azure-enterprise/environments/staging/staging-outputs.json', allowEmptyArchive: true
                     echo "Staging deployment successful."
                 }
                 failure {
@@ -220,7 +220,7 @@ pipeline {
             steps {
                 script {
                     def planSummary = sh(
-                        script: "cat environments/prod/tfplan-prod.txt 2>/dev/null | tail -10 || echo 'Plan file not available'",
+                        script: "cat terraform-azure-enterprise/environments/prod/tfplan-prod.txt 2>/dev/null | tail -10 || echo 'Plan file not available'",
                         returnStdout: true
                     ).trim()
 
@@ -234,7 +234,7 @@ Branch: ${env.GIT_BRANCH}
 Plan Summary (last 10 lines):
 ${planSummary}
 
-Review full plan at: ${env.BUILD_URL}artifact/environments/prod/tfplan-prod.txt
+Review full plan at: ${env.BUILD_URL}artifact/terraform-azure-enterprise/environments/prod/tfplan-prod.txt
 
 Approve to deploy to PRODUCTION.
 Abort to cancel this deployment (CI artifacts remain, can redeploy later).
@@ -273,7 +273,7 @@ Abort to cancel this deployment (CI artifacts remain, can redeploy later).
                         passwordVariable: 'ARM_CLIENT_SECRET'
                     )
                 ]) {
-                    dir('environments/prod') {
+                    dir('terraform-azure-enterprise/environments/prod') {
                         sh '''
                             echo "=== Initialising backend: prod ==="
                             terraform init \
@@ -312,7 +312,7 @@ Abort to cancel this deployment (CI artifacts remain, can redeploy later).
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'environments/prod/prod-outputs.json,environments/prod/tfplan-prod-final.txt'
+                    archiveArtifacts artifacts: 'terraform-azure-enterprise/environments/prod/prod-outputs.json,terraform-azure-enterprise/environments/prod/tfplan-prod-final.txt'
                     echo "PROD DEPLOYED: ${env.JOB_NAME} #${env.BUILD_NUMBER} by ${env.APPROVER}"
                 }
                 failure {
