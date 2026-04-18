@@ -82,6 +82,13 @@ variable "kv_allowed_ips" {
   default = []
 }
 
+variable "vpn_shared_key" {
+  description = "Pre-shared key for the VPN tunnel to simulated on-prem"
+  type        = string
+  sensitive   = true
+  default     = "ci-placeholder-vpn-key-32chars!!"
+}
+
 # Storage
 variable "storage_containers" {
   type = map(object({

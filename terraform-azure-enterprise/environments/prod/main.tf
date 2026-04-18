@@ -1,8 +1,8 @@
 ###############################################################################
-# environments/dev/main.tf
+# environments/prod/main.tf
 #
-# Root module for the dev environment.
-# Orchestrates all child modules with dev-appropriate sizing and settings.
+# Root module for the prod environment.
+# Full HA: zone-redundant, geo-replicated, VPN gateway, simulated on-prem.
 ###############################################################################
 
 ###############################################################################
@@ -56,27 +56,51 @@ module "networking" {
 }
 
 ###############################################################################
-# Security — Firewall, Key Vault, (no VPN in dev to save cost)
+# Security — Firewall, Key Vault, VPN Gateway (prod gets full HA stack)
 ###############################################################################
 module "security" {
   source = "../../modules/security"
 
-  hub_name            = var.hub_name
-  workload            = var.workload
-  environment         = var.environment
-  location            = var.location
-  location_short      = var.location_short
-  resource_group_name = azurerm_resource_group.security.name
-  firewall_subnet_id  = module.networking.firewall_subnet_id
-  gateway_subnet_id   = module.networking.gateway_subnet_id
-  pe_subnet_id        = module.networking.spoke_pe_subnet_ids["app"]
-  hub_vnet_id         = module.networking.hub_vnet_id
-  spoke_vnet_ids      = module.networking.spoke_vnet_ids
-  kv_allowed_ips      = var.kv_allowed_ips
-  deploy_vpn_gateway  = false # VPN Gateway ~$140/month — skip in dev
-  tags                = local.tags
+  hub_name              = var.hub_name
+  workload              = var.workload
+  environment           = var.environment
+  location              = var.location
+  location_short        = var.location_short
+  resource_group_name   = azurerm_resource_group.security.name
+  firewall_subnet_id    = module.networking.firewall_subnet_id
+  gateway_subnet_id     = module.networking.gateway_subnet_id
+  pe_subnet_id          = module.networking.spoke_pe_subnet_ids["app"]
+  hub_vnet_id           = module.networking.hub_vnet_id
+  spoke_vnet_ids        = module.networking.spoke_vnet_ids
+  kv_allowed_ips        = var.kv_allowed_ips
+  deploy_vpn_gateway    = true
+  onprem_vpn_ip         = "1.2.3.4" # placeholder — replaced by simulated-onprem module output
+  onprem_address_spaces = ["192.168.0.0/16"]
+  vpn_shared_key        = var.vpn_shared_key
+  tags                  = local.tags
 
   depends_on = [module.networking]
+}
+
+###############################################################################
+# Simulated On-Premises — replaces real DC for demo/POC environments
+# Creates a VNet in West US 2 with a VPN gateway and a jump VM.
+# Bidirectional VNet-to-VNet tunnel connects it to the hub VPN gateway.
+###############################################################################
+module "simulated_onprem" {
+  source = "../../modules/simulated-onprem"
+
+  environment             = var.environment
+  onprem_location         = "westus2" # paired region to eastus
+  hub_location            = var.location
+  hub_resource_group_name = azurerm_resource_group.security.name
+  hub_vpn_gateway_id      = module.security.vpn_gateway_id
+  hub_address_space       = var.hub_address_space
+  vpn_shared_key          = var.vpn_shared_key
+  ssh_public_key          = var.ssh_public_key
+  tags                    = local.tags
+
+  depends_on = [module.security]
 }
 
 ###############################################################################
