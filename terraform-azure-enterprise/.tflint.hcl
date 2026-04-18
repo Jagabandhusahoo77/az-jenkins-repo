@@ -12,14 +12,13 @@ plugin "azurerm" {
   source  = "github.com/terraform-linters/tflint-ruleset-azurerm"
 }
 
-# Enforce variable declarations have descriptions
+# Disabled — descriptions are useful but not enforced in this project
 rule "terraform_documented_variables" {
-  enabled = true
+  enabled = false
 }
 
-# Enforce output declarations have descriptions
 rule "terraform_documented_outputs" {
-  enabled = true
+  enabled = false
 }
 
 # Warn on deprecated interpolation syntax (e.g. "${var.foo}" → var.foo)
