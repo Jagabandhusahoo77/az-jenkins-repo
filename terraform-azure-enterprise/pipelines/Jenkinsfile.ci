@@ -279,12 +279,13 @@ terraform {
 EOF
                                     terraform init -input=false -reconfigure
 
+                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0 ci-placeholder-key}"
                                     terraform plan \
                                         -input=false \
                                         -out=tfplan-dev.binary \
                                         -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
                                         -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
-                                        -var="ssh_public_key=${TF_VAR_ssh_public_key}"
+                                        -var="ssh_public_key=${SSH_KEY}"
 
                                     terraform show -no-color tfplan-dev.binary > tfplan-dev.txt
                                 '''
@@ -317,12 +318,13 @@ terraform {
 EOF
                                     terraform init -input=false -reconfigure
 
+                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0 ci-placeholder-key}"
                                     terraform plan \
                                         -input=false \
                                         -out=tfplan-staging.binary \
                                         -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
                                         -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
-                                        -var="ssh_public_key=${TF_VAR_ssh_public_key}"
+                                        -var="ssh_public_key=${SSH_KEY}"
 
                                     terraform show -no-color tfplan-staging.binary > tfplan-staging.txt
                                 '''
@@ -355,12 +357,13 @@ terraform {
 EOF
                                     terraform init -input=false -reconfigure
 
+                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0 ci-placeholder-key}"
                                     terraform plan \
                                         -input=false \
                                         -out=tfplan-prod.binary \
                                         -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
                                         -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
-                                        -var="ssh_public_key=${TF_VAR_ssh_public_key}"
+                                        -var="ssh_public_key=${SSH_KEY}"
 
                                     terraform show -no-color tfplan-prod.binary > tfplan-prod.txt
                                 '''

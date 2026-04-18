@@ -102,7 +102,7 @@ resource "azurerm_mssql_database" "this" {
   long_term_retention_policy {
     weekly_retention  = var.environment == "prod" ? "P4W" : "P1W"
     monthly_retention = var.environment == "prod" ? "P12M" : "P1M"
-    yearly_retention  = var.environment == "prod" ? "P5Y" : ""
+    yearly_retention  = var.environment == "prod" ? "P5Y" : "P1Y"
     week_of_year      = 1
   }
 
