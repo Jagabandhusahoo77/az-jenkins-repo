@@ -271,7 +271,7 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/dev') {
                                 sh '''
-                                    terraform init -input=false -backend=false
+                                    terraform init -input=false -backend=false -reconfigure
 
                                     terraform plan \
                                         -input=false \
@@ -303,7 +303,7 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/staging') {
                                 sh '''
-                                    terraform init -input=false -backend=false
+                                    terraform init -input=false -backend=false -reconfigure
 
                                     terraform plan \
                                         -input=false \
@@ -335,7 +335,7 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/prod') {
                                 sh '''
-                                    terraform init -input=false -backend=false
+                                    terraform init -input=false -backend=false -reconfigure
 
                                     terraform plan \
                                         -input=false \
