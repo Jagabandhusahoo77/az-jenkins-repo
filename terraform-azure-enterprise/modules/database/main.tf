@@ -52,12 +52,12 @@ resource "azurerm_mssql_server" "this" {
 
 # Enable Azure Defender for SQL on the server — detects SQL injection, anomalous access
 resource "azurerm_mssql_server_security_alert_policy" "this" {
-  resource_group_name         = var.resource_group_name
-  server_name                 = azurerm_mssql_server.this.name
-  state                       = "Enabled"
-  email_addresses             = var.security_alert_emails
-  email_account_admins        = true   # CKV_AZURE_27: notify subscription admins
-  retention_days              = 90
+  resource_group_name  = var.resource_group_name
+  server_name          = azurerm_mssql_server.this.name
+  state                = "Enabled"
+  email_addresses      = var.security_alert_emails
+  email_account_admins = true # CKV_AZURE_27: notify subscription admins
+  retention_days       = 90
 }
 
 # SQL Auditing — required by CKV_AZURE_23 / CKV_AZURE_24
@@ -66,7 +66,7 @@ resource "azurerm_mssql_server_extended_auditing_policy" "this" {
   storage_endpoint                        = var.audit_storage_endpoint
   storage_account_access_key              = var.audit_storage_key
   storage_account_access_key_is_secondary = false
-  retention_in_days                       = 90   # CKV_AZURE_24: must be > 90 days
+  retention_in_days                       = 90 # CKV_AZURE_24: must be > 90 days
   log_monitoring_enabled                  = true
 }
 

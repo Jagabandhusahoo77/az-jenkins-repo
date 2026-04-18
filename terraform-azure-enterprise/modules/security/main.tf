@@ -37,18 +37,18 @@ resource "azurerm_public_ip" "firewall" {
 }
 
 resource "azurerm_firewall_policy" "this" {
-  name                = "afwp-${var.environment}-${var.location_short}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  name                     = "afwp-${var.environment}-${var.location_short}"
+  location                 = var.location
+  resource_group_name      = var.resource_group_name
   sku                      = "Premium"
-  threat_intelligence_mode = "Deny"   # Deny blocks known-bad IPs, not just alerts
+  threat_intelligence_mode = "Deny" # Deny blocks known-bad IPs, not just alerts
 
   dns {
     proxy_enabled = true
   }
 
   intrusion_detection {
-    mode = "Deny"   # IDPS in Deny mode — blocks malicious traffic, not just logs
+    mode = "Deny" # IDPS in Deny mode — blocks malicious traffic, not just logs
   }
 
   tags = var.tags
@@ -167,7 +167,7 @@ resource "azurerm_application_gateway" "this" {
 
   ssl_policy {
     policy_type          = "Predefined"
-    policy_name          = "AppGwSslPolicy20220101"  # TLS 1.2+ only, disables TLS 1.0/1.1
+    policy_name          = "AppGwSslPolicy20220101" # TLS 1.2+ only, disables TLS 1.0/1.1
     min_protocol_version = "TLSv1_2"
   }
 

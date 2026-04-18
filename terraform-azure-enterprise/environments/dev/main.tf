@@ -49,8 +49,8 @@ module "networking" {
   gateway_subnet_prefix    = var.gateway_subnet_prefix
   bastion_subnet_prefix    = var.bastion_subnet_prefix
   management_subnet_prefix = var.management_subnet_prefix
-  spokes = var.spokes
-  tags   = local.tags
+  spokes                   = var.spokes
+  tags                     = local.tags
 
   depends_on = [azurerm_resource_group.network]
 }
