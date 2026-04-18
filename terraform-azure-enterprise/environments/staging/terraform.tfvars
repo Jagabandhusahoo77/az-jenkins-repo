@@ -26,8 +26,8 @@ spokes = {
 db_sku_name    = "GP_Gen5_4"
 db_max_size_gb = 64
 
-aad_admin_login     = "DBA-Admins"
-aad_admin_object_id = "00000000-0000-0000-0000-000000000000"
+aad_admin_login     = "terraform-sp"
+aad_admin_object_id = "f9f390ab-9e5b-4613-bee3-4d0310d8d45e"
 
 security_alert_emails = ["platform-team@company.com"]
 

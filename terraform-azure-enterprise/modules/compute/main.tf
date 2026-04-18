@@ -187,6 +187,8 @@ resource "azurerm_linux_virtual_machine_scale_set" "app" {
   lifecycle {
     ignore_changes = [instances] # allow autoscale to manage instance count
   }
+
+  depends_on = [azurerm_lb_rule.http] # LB rule must exist before VMSS references the probe
 }
 
 ###############################################################################

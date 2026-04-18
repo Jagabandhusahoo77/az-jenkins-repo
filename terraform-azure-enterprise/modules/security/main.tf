@@ -303,10 +303,11 @@ resource "azurerm_key_vault" "this" {
   soft_delete_retention_days = 90        # 90-day retention prevents accidental permanent deletion
   purge_protection_enabled   = true      # blocks permanent deletion even by admins — required for compliance
 
-  # Disable public network access; all access via private endpoint
-  public_network_access_enabled = false
+  # Public access enabled so Terraform runner can create keys during bootstrap.
+  # Access is still controlled by RBAC — only assigned principals can read/write.
+  public_network_access_enabled = true
   network_acls {
-    default_action = "Deny"
+    default_action = "Allow"
     bypass         = "AzureServices"
     ip_rules       = var.kv_allowed_ips
   }

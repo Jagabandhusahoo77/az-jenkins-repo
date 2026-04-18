@@ -39,8 +39,8 @@ db_sku_name    = "GP_Gen5_2"
 db_max_size_gb = 32
 
 # AAD admin (use your AD group object ID)
-aad_admin_login     = "DBA-Admins"
-aad_admin_object_id = "00000000-0000-0000-0000-000000000000" # replace with real GUID
+aad_admin_login     = "terraform-sp"
+aad_admin_object_id = "f9f390ab-9e5b-4613-bee3-4d0310d8d45e"
 
 # Security alert emails
 security_alert_emails = ["platform-team@company.com"]

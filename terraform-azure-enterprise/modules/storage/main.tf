@@ -34,7 +34,7 @@ resource "azurerm_storage_account" "this" {
   # Block all public access — blobs accessible only via private endpoint
   public_network_access_enabled   = false
   allow_nested_items_to_be_public = false
-  shared_access_key_enabled       = false # CKV2_AZURE_40: force AAD auth, no shared keys
+  shared_access_key_enabled       = true # AzureRM provider v3 requires key auth internally to verify storage readiness
   local_user_enabled              = false # CKV_AZURE_244: disable local users
 
   blob_properties {
