@@ -279,7 +279,7 @@ terraform {
 EOF
                                     terraform init -input=false -reconfigure
 
-                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0 ci-placeholder-key}"
+                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCl5a7b9yxGY0NETLq5jc3rGykQIsdVcr2uExAT5Hqe6NTmJ5vWw4Ga5NKDiRHER0cI+Qs2TGcnJ4KYKtLYhX9NWNIlbxFnitdRHyap6ZlvGlc/dH5+b0i5Sfboo3F8OUzei0tMhUtbrDNMgzIPawpiDx9JIW9uWuXvzq0VKj8otgTiF2AHXiE1yj3CybNlZDMI3oISVZ9Rgt0w1Wm+cTRcRDodpgTwNP8vNKQj2vPxWVtTTdzbZpcaJ6r3IYKqwcWUDyNTr95cGVBZ7dsSjVgkWpznfJP7+Q2GSg/mR7GFhr8XuzWeKXgWCx4A7e0HIsyXngGgJrDeFEv5VLgmkn4X ci-placeholder}"
                                     terraform plan \
                                         -input=false \
                                         -out=tfplan-dev.binary \
@@ -318,7 +318,7 @@ terraform {
 EOF
                                     terraform init -input=false -reconfigure
 
-                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0 ci-placeholder-key}"
+                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCl5a7b9yxGY0NETLq5jc3rGykQIsdVcr2uExAT5Hqe6NTmJ5vWw4Ga5NKDiRHER0cI+Qs2TGcnJ4KYKtLYhX9NWNIlbxFnitdRHyap6ZlvGlc/dH5+b0i5Sfboo3F8OUzei0tMhUtbrDNMgzIPawpiDx9JIW9uWuXvzq0VKj8otgTiF2AHXiE1yj3CybNlZDMI3oISVZ9Rgt0w1Wm+cTRcRDodpgTwNP8vNKQj2vPxWVtTTdzbZpcaJ6r3IYKqwcWUDyNTr95cGVBZ7dsSjVgkWpznfJP7+Q2GSg/mR7GFhr8XuzWeKXgWCx4A7e0HIsyXngGgJrDeFEv5VLgmkn4X ci-placeholder}"
                                     terraform plan \
                                         -input=false \
                                         -out=tfplan-staging.binary \
@@ -357,7 +357,7 @@ terraform {
 EOF
                                     terraform init -input=false -reconfigure
 
-                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0 ci-placeholder-key}"
+                                    SSH_KEY="${TF_VAR_ssh_public_key:-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCl5a7b9yxGY0NETLq5jc3rGykQIsdVcr2uExAT5Hqe6NTmJ5vWw4Ga5NKDiRHER0cI+Qs2TGcnJ4KYKtLYhX9NWNIlbxFnitdRHyap6ZlvGlc/dH5+b0i5Sfboo3F8OUzei0tMhUtbrDNMgzIPawpiDx9JIW9uWuXvzq0VKj8otgTiF2AHXiE1yj3CybNlZDMI3oISVZ9Rgt0w1Wm+cTRcRDodpgTwNP8vNKQj2vPxWVtTTdzbZpcaJ6r3IYKqwcWUDyNTr95cGVBZ7dsSjVgkWpznfJP7+Q2GSg/mR7GFhr8XuzWeKXgWCx4A7e0HIsyXngGgJrDeFEv5VLgmkn4X ci-placeholder}"
                                     terraform plan \
                                         -input=false \
                                         -out=tfplan-prod.binary \
