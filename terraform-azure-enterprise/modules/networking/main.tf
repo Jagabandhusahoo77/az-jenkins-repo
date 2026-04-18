@@ -235,6 +235,197 @@ resource "azurerm_network_security_group" "data" {
   tags = var.tags
 }
 
+# Bastion NSG — rules are MANDATED by Microsoft for Azure Bastion to function.
+# Deviating from these rules breaks Bastion connectivity.
+# Ref: https://learn.microsoft.com/en-us/azure/bastion/bastion-nsg
+resource "azurerm_network_security_group" "bastion" {
+  name                = "nsg-bastion-${var.environment}-${var.location_short}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  # --- Inbound ---
+  security_rule {
+    name                       = "Allow-HTTPS-From-Internet"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "Internet"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "Allow-GatewayManager"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "GatewayManager"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "Allow-AzureLoadBalancer"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "AzureLoadBalancer"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "Allow-BastionDataPlane-Inbound"
+    priority                   = 130
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_ranges    = ["8080", "5701"]
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = "VirtualNetwork"
+  }
+  security_rule {
+    name                       = "Deny-All-Inbound"
+    priority                   = 4000
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  # --- Outbound ---
+  security_rule {
+    name                       = "Allow-SSH-RDP-To-VMs"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["22", "3389"]
+    source_address_prefix      = "*"
+    destination_address_prefix = "VirtualNetwork"
+  }
+  security_rule {
+    name                       = "Allow-AzureCloud-Outbound"
+    priority                   = 110
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "*"
+    destination_address_prefix = "AzureCloud"
+  }
+  security_rule {
+    name                       = "Allow-BastionDataPlane-Outbound"
+    priority                   = 120
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_ranges    = ["8080", "5701"]
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = "VirtualNetwork"
+  }
+  security_rule {
+    name                       = "Allow-HTTP-SessionInfo"
+    priority                   = 130
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "Internet"
+  }
+
+  tags = var.tags
+}
+
+# Management subnet NSG — jump-box access only from trusted ranges via Bastion or VPN
+resource "azurerm_network_security_group" "management" {
+  name                = "nsg-mgmt-${var.environment}-${var.location_short}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  security_rule {
+    name                       = "Allow-SSH-RDP-From-Bastion"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["22", "3389"]
+    source_address_prefix      = var.bastion_subnet_prefix
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "Allow-HTTPS-Outbound"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "*"
+    destination_address_prefix = "Internet"
+  }
+  security_rule {
+    name                       = "Deny-Internet-Inbound"
+    priority                   = 4000
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "Internet"
+    destination_address_prefix = "*"
+  }
+
+  tags = var.tags
+}
+
+# Private endpoint subnet NSG — deny direct internet, allow VNet traffic only
+resource "azurerm_network_security_group" "pe" {
+  for_each = var.spokes
+
+  name                = "nsg-pe-${each.key}-${var.environment}-${var.location_short}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  security_rule {
+    name                       = "Allow-VNet-Inbound"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "Deny-Internet-Inbound"
+    priority                   = 4000
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "Internet"
+    destination_address_prefix = "*"
+  }
+
+  tags = var.tags
+}
+
 # NSG associations
 resource "azurerm_subnet_network_security_group_association" "app" {
   for_each = var.spokes
@@ -248,6 +439,23 @@ resource "azurerm_subnet_network_security_group_association" "data" {
 
   subnet_id                 = azurerm_subnet.spoke_data[each.key].id
   network_security_group_id = azurerm_network_security_group.data[each.key].id
+}
+
+resource "azurerm_subnet_network_security_group_association" "bastion" {
+  subnet_id                 = azurerm_subnet.bastion.id
+  network_security_group_id = azurerm_network_security_group.bastion.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "management" {
+  subnet_id                 = azurerm_subnet.management.id
+  network_security_group_id = azurerm_network_security_group.management.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "pe" {
+  for_each = var.spokes
+
+  subnet_id                 = azurerm_subnet.spoke_pe[each.key].id
+  network_security_group_id = azurerm_network_security_group.pe[each.key].id
 }
 
 ###############################################################################

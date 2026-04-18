@@ -32,7 +32,7 @@ skip-check:
   - CKV2_AZURE_1
 
   # CKV2_AZURE_31: AzureFirewallSubnet and GatewaySubnet — Azure PROHIBITS NSG on these
-  #   subnets by design. Bastion and PE subnets protected by NSG at spoke level.
+  #   subnets by design. All other subnets (bastion, mgmt, pe) now have dedicated NSGs.
   - CKV2_AZURE_31
 
   # CKV_AZURE_206: ZRS and GZRS ARE replication types — checkov incorrectly flags
