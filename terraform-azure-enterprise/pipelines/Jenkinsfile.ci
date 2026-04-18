@@ -271,23 +271,15 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/dev') {
                                 sh '''
-                                    terraform init \
-                                        -input=false \
-                                        -backend-config="resource_group_name=rg-tfstate-dev-eus" \
-                                        -backend-config="storage_account_name=sttfstatedeveus" \
-                                        -backend-config="container_name=tfstate" \
-                                        -backend-config="key=dev/terraform.tfstate"
+                                    terraform init -input=false -backend=false
 
-                                    # -var flags for secrets injected from Jenkins env vars
                                     terraform plan \
                                         -input=false \
-                                        -detailed-exitcode \
                                         -out=tfplan-dev.binary \
                                         -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
                                         -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
                                         -var="ssh_public_key=${TF_VAR_ssh_public_key}"
 
-                                    # Save human-readable plan for review
                                     terraform show -no-color tfplan-dev.binary > tfplan-dev.txt
                                 '''
                             }
@@ -311,16 +303,10 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/staging') {
                                 sh '''
-                                    terraform init \
-                                        -input=false \
-                                        -backend-config="resource_group_name=rg-tfstate-staging-eus" \
-                                        -backend-config="storage_account_name=sttfstatestagingeus" \
-                                        -backend-config="container_name=tfstate" \
-                                        -backend-config="key=staging/terraform.tfstate"
+                                    terraform init -input=false -backend=false
 
                                     terraform plan \
                                         -input=false \
-                                        -detailed-exitcode \
                                         -out=tfplan-staging.binary \
                                         -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
                                         -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
@@ -349,16 +335,10 @@ pipeline {
                         ]) {
                             dir('terraform-azure-enterprise/environments/prod') {
                                 sh '''
-                                    terraform init \
-                                        -input=false \
-                                        -backend-config="resource_group_name=rg-tfstate-prod-eus" \
-                                        -backend-config="storage_account_name=sttfstateprodeus" \
-                                        -backend-config="container_name=tfstate" \
-                                        -backend-config="key=prod/terraform.tfstate"
+                                    terraform init -input=false -backend=false
 
                                     terraform plan \
                                         -input=false \
-                                        -detailed-exitcode \
                                         -out=tfplan-prod.binary \
                                         -var="sql_admin_login=${TF_VAR_sql_admin_login}" \
                                         -var="sql_admin_password=${TF_VAR_sql_admin_password}" \
