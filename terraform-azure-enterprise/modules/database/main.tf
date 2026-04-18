@@ -60,17 +60,19 @@ resource "azurerm_mssql_server_security_alert_policy" "this" {
   retention_days       = 90
 }
 
-# SQL Auditing — required by CKV_AZURE_23 / CKV_AZURE_24
+# SQL Auditing — only deployed when storage account is provided
 resource "azurerm_mssql_server_extended_auditing_policy" "this" {
+  count                                   = var.audit_storage_endpoint != "" ? 1 : 0
   server_id                               = azurerm_mssql_server.this.id
   storage_endpoint                        = var.audit_storage_endpoint
   storage_account_access_key              = var.audit_storage_key
   storage_account_access_key_is_secondary = false
-  retention_in_days                       = 90 # CKV_AZURE_24: must be > 90 days
+  retention_in_days                       = 90
   log_monitoring_enabled                  = true
 }
 
 resource "azurerm_mssql_server_vulnerability_assessment" "this" {
+  count                           = var.vulnerability_storage_key != "" ? 1 : 0
   server_security_alert_policy_id = azurerm_mssql_server_security_alert_policy.this.id
   storage_container_path          = "${var.vulnerability_storage_endpoint}${var.vulnerability_storage_container}/"
   storage_account_access_key      = var.vulnerability_storage_key
@@ -95,7 +97,7 @@ resource "azurerm_mssql_database" "this" {
   zone_redundant = var.zone_redundant # true for prod
 
   # Geo-redundant backup storage for prod
-  storage_account_type = var.environment == "prod" ? "GeoRedundant" : "Local"
+  storage_account_type = var.environment == "prod" ? "Geo" : "Local"
 
   long_term_retention_policy {
     weekly_retention  = var.environment == "prod" ? "P4W" : "P1W"

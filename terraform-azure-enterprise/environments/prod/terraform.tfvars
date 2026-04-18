@@ -45,10 +45,10 @@ autoscale_max  = 20
 lb_frontend_ip = "10.3.1.100"
 
 storage_containers = {
-  app-data = { immutable = false }
-  audit    = { immutable = true }
-  backups  = { immutable = false }
-  dr       = { immutable = false }
+  app-data          = { immutable = false }
+  audit             = { immutable = true }
+  backups           = { immutable = false }
+  disaster-recovery = { immutable = false }
 }
 
 tags = {

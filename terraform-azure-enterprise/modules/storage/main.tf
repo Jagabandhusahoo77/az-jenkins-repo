@@ -220,6 +220,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "blob_spokes" {
 # Diagnostic Settings — send logs to Log Analytics
 ###############################################################################
 resource "azurerm_monitor_diagnostic_setting" "storage" {
+  count                      = var.log_analytics_workspace_id != "" ? 1 : 0
   name                       = "diag-${azurerm_storage_account.this.name}"
   target_resource_id         = "${azurerm_storage_account.this.id}/blobServices/default"
   log_analytics_workspace_id = var.log_analytics_workspace_id
